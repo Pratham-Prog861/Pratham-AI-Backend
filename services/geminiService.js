@@ -2,22 +2,8 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
 dotenv.config();
 
-function formatResponse(text) {
-    return text
-      .replace(/#+\s*/g, '')  // Remove headings
-      .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove bold
-      .replace(/\*(.*?)\*/g, '$1')      // Remove italics
-      .replace(/`{1,3}(.*?)`{1,3}/g, '$1')  // Remove code blocks
-      .replace(/\[(.*?)\]\(.*?\)/g, '$1')   // Remove links but keep the text
-      .replace(/\n{3,}/g, '\n\n')  // Limit consecutive newlines
-      .trim();
-}
-
 // Initialize the Google Generative AI with your API key
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-// Use a valid model name
-const MODEL_NAME = 'gemini-2.0-flash'; 
 
 /**
  * Generates a response using the Gemini Pro model
@@ -27,12 +13,12 @@ const MODEL_NAME = 'gemini-2.0-flash';
 async function generateResponse(prompt) {
   try {
     // Get the Gemini Pro model
-    const model = genAI.getGenerativeModel({ model: MODEL_NAME });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
     // Generate content
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    
+
     return formatResponse(response.text());
   } catch (error) {
     console.error('Error generating response:', error);
@@ -51,43 +37,48 @@ async function generateChatResponse(chatHistory) {
       throw new Error('Chat history is empty');
     }
 
-    const model = genAI.getGenerativeModel({ 
-      model: MODEL_NAME, // Update model name
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash', // Update model name
       generationConfig: {
         maxOutputTokens: 1000,
       },
     });
 
     // Convert chat history to the format expected by Gemini
-    const history = chatHistory.slice(0, -1).map(msg => ({
+    const history = chatHistory.map(msg => ({
       role: msg.sender === 'user' ? 'user' : 'model',
       parts: [{ text: msg.content }]
     }));
 
+    // Start chat with history
+    const chat = model.startChat({
+      history: history.slice(0, -1) // exclude the last message
+    });
+
+    // Get the last user message
     const lastMessage = chatHistory[chatHistory.length - 1];
-    const lastUserMessage = lastMessage.content;
-    
-    try {
-      let result;
-      if (history.length > 0) {
-        const chat = model.startChat({
-          history: history,
-        });
-        result = await chat.sendMessage(lastUserMessage);
-      } else {
-        result = await model.generateContent(lastUserMessage);
-      }
-      
-      const response = await result.response;
-      return formatResponse(response.text());
-    } catch (error) {
-      console.error('Gemini API error:', error);
-      throw new Error('Failed to generate response from Gemini');
-    }
+
+    // Generate response
+    const result = await chat.sendMessage(lastMessage.content);
+    const response = await result.response;
+    const text = response.text();
+
+    return text;
   } catch (error) {
-    console.error('Error in chat generation:', error);
-    throw error;
+    console.error('Gemini API error:', error);
+    throw new Error('Failed to generate response from Gemini');
   }
+}
+
+function formatResponse(text) {
+  return text
+    .replace(/#+\s*/g, '')  // Remove headings
+    .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove bold
+    .replace(/\*(.*?)\*/g, '$1')      // Remove italics
+    .replace(/`{1,3}(.*?)`{1,3}/g, '$1')  // Remove code blocks
+    .replace(/\[(.*?)\]\(.*?\)/g, '$1')   // Remove links but keep the text
+    .replace(/\n{3,}/g, '\n\n')  // Limit consecutive newlines
+    .trim();
 }
 
 export { generateResponse, generateChatResponse };

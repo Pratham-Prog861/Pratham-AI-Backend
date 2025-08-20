@@ -1,4 +1,24 @@
 {
   "username": "Pratham",
-  "chats": []
+  "chats": [
+    {
+      "id": "1755671781150",
+      "title": "Write a short poem",
+      "messages": [
+        {
+          "id": "1755671784244",
+          "content": "Write a short poem",
+          "sender": "user",
+          "timestamp": "2025-08-20T06:36:24.244Z"
+        },
+        {
+          "id": "1755671785746",
+          "content": "The sun dips low, a fiery kiss,\nUpon the hills, a golden bliss.\nThe day is done, the stars ignite,\nAnd whisper secrets to the night.\n",
+          "sender": "ai",
+          "timestamp": "2025-08-20T06:36:25.745Z"
+        }
+      ],
+      "createdAt": "2025-08-20T06:36:21.150Z"
+    }
+  ]
 }

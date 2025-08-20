@@ -39,14 +39,43 @@ const saveUserData = (username, data) => {
 // API Routes
 
 // Login/Get user data
-app.post("/api/login", (req, res) => {
-    const { username } = req.body;
-    if (!username) {
-        return res.status(400).json({ error: "Username is required" });
-    }
+app.post("/api/login", async (req, res) => {
+    try {
+        const { username } = req.body;
 
-    const userData = getUserData(username);
-    res.json(userData);
+        if (!username || typeof username !== 'string') {
+            return res.status(400).json({
+                message: 'Username is required'
+            });
+        }
+
+        const trimmedUsername = username.trim();
+        if (!trimmedUsername) {
+            return res.status(400).json({
+                message: 'Username cannot be empty'
+            });
+        }
+
+        // Get or create user data
+        let userData = getUserData(trimmedUsername);
+        if (!userData) {
+            userData = {
+                username: trimmedUsername,
+                chats: []
+            };
+            saveUserData(trimmedUsername, userData);
+        }
+
+        res.json({
+            username: trimmedUsername,
+            chats: userData.chats
+        });
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({
+            message: 'Internal server error'
+        });
+    }
 });
 
 // Get all chats for a user
@@ -58,71 +87,101 @@ app.get("/api/chats/:username", (req, res) => {
 
 // Create a new chat
 app.post("/api/chats/:username", async (req, res) => {
-    const { username } = req.params;
-    const userData = getUserData(username);
+    try {
+        const { username } = req.params;
+        const userData = getUserData(username);
 
-    const newChat = {
-        id: Date.now().toString(),
-        title: req.body.title || "New Chat",
-        messages: [],
-        createdAt: new Date().toISOString()
-    };
+        if (!userData) {
+            return res.status(404).json({
+                message: 'User not found'
+            });
+        }
 
-    userData.chats.unshift(newChat);
-    saveUserData(username, userData);
+        const newChat = {
+            id: Date.now().toString(),
+            title: 'New Chat',
+            messages: [],
+            createdAt: new Date().toISOString()
+        };
 
-    res.status(201).json(newChat);
+        userData.chats.unshift(newChat);
+        saveUserData(username, userData);
+
+        res.json(newChat);
+    } catch (error) {
+        console.error('Create chat error:', error);
+        res.status(500).json({
+            message: 'Failed to create chat'
+        });
+    }
 });
 
 // Send a message in a chat
 app.post("/api/chats/:username/:chatId/messages", async (req, res) => {
     const { username, chatId } = req.params;
-    const { message } = req.body;
-
-    if (!message) {
-        return res.status(400).json({ error: "Message is required" });
-    }
-
-    const userData = getUserData(username);
-    const chat = userData.chats.find(c => c.id === chatId);
-
-    if (!chat) {
-        return res.status(404).json({ error: "Chat not found" });
-    }
+    const { content } = req.body;
 
     try {
-        // Add user message
-        const userMessage = {
-            id: Date.now().toString(),
-            content: message,
-            sender: "user",
-            timestamp: new Date().toISOString()
-        };
-        chat.messages.push(userMessage);
-
-        // Generate AI response using Gemini
-        const aiResponseText = await generateChatResponse(chat.messages);
-
-        // Add AI response
-        const aiResponse = {
-            id: (Date.now() + 1).toString(),
-            content: aiResponseText,
-            sender: "ai",
-            timestamp: new Date().toISOString()
-        };
-        chat.messages.push(aiResponse);
-
-        // Update chat title if it's the first message
-        if (chat.messages.length === 2) {
-            chat.title = message.substring(0, 30) + (message.length > 30 ? "..." : "");
+        // Input validation
+        if (!content?.trim()) {
+            return res.status(400).json({ message: 'Message content is required' });
         }
 
+        // Get user data
+        const userData = getUserData(username);
+        if (!userData) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const chat = userData.chats.find(c => c.id === chatId);
+
+        // Update chat title if this is the first message
+        if (chat.messages.length === 0) {
+            // Create a short title from the first message
+            chat.title = content.length > 30
+                ? content.substring(0, 30) + '...'
+                : content;
+        }
+
+        const userMessage = {
+            id: Date.now().toString(),
+            content: content.trim(),
+            sender: 'user',
+            timestamp: new Date().toISOString()
+        };
+
+        // Add user message to chat
+        chat.messages.push(userMessage);
+
+        // Generate AI response
+        const aiResponseContent = await generateChatResponse([...chat.messages]);
+
+        // Create AI message
+        const aiMessage = {
+            id: (Date.now() + 1).toString(),
+            content: aiResponseContent,
+            sender: 'ai',
+            timestamp: new Date().toISOString()
+        };
+
+        // Add AI message to chat
+        chat.messages.push(aiMessage);
+
+        // Save updated chat with new title and messages
         saveUserData(username, userData);
 
-        res.json({ userMessage, aiResponse });
+        // Send both messages back to client
+        res.json({
+            userMessage,
+            aiResponse: aiMessage,
+            chatTitle: chat.title // Send back updated title
+        });
     } catch (error) {
-        console.error('Error in message processing:', error);
-        res.status(500).json({ error: 'Failed to process message with Gemini API' });
+        console.error('Message handling error:', error);
+        res.status(500).json({
+            message: 'Failed to process message',
+            error: error.message
+        });
     }
 });
 
