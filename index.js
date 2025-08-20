@@ -40,42 +40,13 @@ const saveUserData = (username, data) => {
 
 // Login/Get user data
 app.post("/api/login", async (req, res) => {
-    try {
-        const { username } = req.body;
-
-        if (!username || typeof username !== 'string') {
-            return res.status(400).json({
-                message: 'Username is required'
-            });
-        }
-
-        const trimmedUsername = username.trim();
-        if (!trimmedUsername) {
-            return res.status(400).json({
-                message: 'Username cannot be empty'
-            });
-        }
-
-        // Get or create user data
-        let userData = getUserData(trimmedUsername);
-        if (!userData) {
-            userData = {
-                username: trimmedUsername,
-                chats: []
-            };
-            saveUserData(trimmedUsername, userData);
-        }
-
-        res.json({
-            username: trimmedUsername,
-            chats: userData.chats
-        });
-    } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({
-            message: 'Internal server error'
-        });
+    const { username } = req.body;
+    if (!username) {
+        return res.status(400).json({ error: "Username is required" });
     }
+
+    const userData = getUserData(username);
+    res.json(userData);
 });
 
 // Get all chats for a user

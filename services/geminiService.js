@@ -4,6 +4,7 @@ dotenv.config();
 
 // Initialize the Google Generative AI with your API key
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const MODEL_NAME = 'gemini-2.0-flash'; 
 
 /**
  * Generates a response using the Gemini Pro model
@@ -13,12 +14,12 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 async function generateResponse(prompt) {
   try {
     // Get the Gemini Pro model
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = genAI.getGenerativeModel({ model: MODEL_NAME });
 
     // Generate content
     const result = await model.generateContent(prompt);
     const response = await result.response;
-
+    
     return formatResponse(response.text());
   } catch (error) {
     console.error('Error generating response:', error);
@@ -37,8 +38,8 @@ async function generateChatResponse(chatHistory) {
       throw new Error('Chat history is empty');
     }
 
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash', // Update model name
+    const model = genAI.getGenerativeModel({ 
+      model: MODEL_NAME, // Update model name
       generationConfig: {
         maxOutputTokens: 1000,
       },
@@ -57,7 +58,7 @@ async function generateChatResponse(chatHistory) {
 
     // Get the last user message
     const lastMessage = chatHistory[chatHistory.length - 1];
-
+    
     // Generate response
     const result = await chat.sendMessage(lastMessage.content);
     const response = await result.response;
@@ -71,14 +72,14 @@ async function generateChatResponse(chatHistory) {
 }
 
 function formatResponse(text) {
-  return text
-    .replace(/#+\s*/g, '')  // Remove headings
-    .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove bold
-    .replace(/\*(.*?)\*/g, '$1')      // Remove italics
-    .replace(/`{1,3}(.*?)`{1,3}/g, '$1')  // Remove code blocks
-    .replace(/\[(.*?)\]\(.*?\)/g, '$1')   // Remove links but keep the text
-    .replace(/\n{3,}/g, '\n\n')  // Limit consecutive newlines
-    .trim();
+    return text
+      .replace(/#+\s*/g, '')  // Remove headings
+      .replace(/\*\*(.*?)\*\*/g, '$1')  // Remove bold
+      .replace(/\*(.*?)\*/g, '$1')      // Remove italics
+      .replace(/`{1,3}(.*?)`{1,3}/g, '$1')  // Remove code blocks
+      .replace(/\[(.*?)\]\(.*?\)/g, '$1')   // Remove links but keep the text
+      .replace(/\n{3,}/g, '\n\n')  // Limit consecutive newlines
+      .trim();
 }
 
 export { generateResponse, generateChatResponse };
